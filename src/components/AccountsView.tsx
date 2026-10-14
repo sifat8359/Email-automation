@@ -10,6 +10,8 @@ import {
   AlertCircle,
   X,
   CheckCircle2,
+  RefreshCw,
+  Mail,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { GmailAccount } from '../types';
@@ -27,7 +29,12 @@ export const AccountsView: React.FC<{ onOpenAddAccount: () => void }> = ({ onOpe
     accounts,
     updateAccount,
     deleteAccount,
+    syncAllImapMailboxes,
+    isImapSyncing,
+    lastImapSyncAt,
   } = useApp();
+
+  const [toastFeedback, setToastFeedback] = useState<string | null>(null);
 
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editLimitValue, setEditLimitValue] = useState<number>(50);
@@ -180,12 +187,41 @@ export const AccountsView: React.FC<{ onOpenAddAccount: () => void }> = ({ onOpe
         title="Email accounts"
         subtitle="Connected sending mailboxes for your automated cold outreach campaigns."
         action={
-          <Button variant="primary" onClick={onOpenAddAccount}>
-            <Plus className="h-4 w-4" />
-            <span>Connect new account</span>
-          </Button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                const res = await syncAllImapMailboxes();
+                setToastFeedback(res.message);
+                setTimeout(() => setToastFeedback(null), 4000);
+              }}
+              disabled={isImapSyncing}
+              className="text-xs py-1.5 px-3 flex items-center gap-1.5"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isImapSyncing ? 'animate-spin' : ''}`} />
+              <span>{isImapSyncing ? 'Syncing inboxes...' : 'Sync All Inboxes'}</span>
+            </Button>
+
+            <Button variant="primary" onClick={onOpenAddAccount} className="text-xs py-1.5 px-3">
+              <Plus className="h-4 w-4" />
+              <span>Connect new account</span>
+            </Button>
+          </div>
         }
       />
+
+      {/* Toast Feedback */}
+      {toastFeedback && (
+        <div className="flex items-center justify-between px-4 py-3 rounded-[10px] bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--text-primary)]">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-[var(--success)]" />
+            <span>{toastFeedback}</span>
+          </div>
+          <button onClick={() => setToastFeedback(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-3 cursor-pointer">
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Accounts List: ONE Card wrapping the whole list, 1px dividers between rows */}
       {accounts.length === 0 ? (
@@ -238,6 +274,14 @@ export const AccountsView: React.FC<{ onOpenAddAccount: () => void }> = ({ onOpe
 
                           <span className="text-[12px] text-[var(--text-secondary)]">
                             {acc.provider === 'custom_smtp' ? 'Custom SMTP' : acc.provider}
+                          </span>
+
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${hasSmtp ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-white/[0.04] text-zinc-400'}`}>
+                            {hasSmtp ? 'SMTP Handshake OK' : 'Sandbox'}
+                          </span>
+
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${acc.imapConfig ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-white/[0.04] text-zinc-400'}`}>
+                            {acc.imapConfig ? 'IMAP Inbound OK' : 'IMAP Auto'}
                           </span>
                         </div>
 

@@ -98,6 +98,13 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
     message: string;
   } | null>(null);
 
+  // IMAP connection testing state
+  const [isVerifyingImap, setIsVerifyingImap] = useState(false);
+  const [imapVerifyStatus, setImapVerifyStatus] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+
   // Live test send state
   const [testRecipientEmail, setTestRecipientEmail] = useState('');
   const [isSendingTest, setIsSendingTest] = useState(false);
@@ -239,9 +246,74 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
     }
   };
 
+  const handleTestImapConnection = async () => {
+    if (!email.trim() || !appPassword.trim()) {
+      setImapVerifyStatus({
+        success: false,
+        message: 'Please enter your email address and App Password first.',
+      });
+      return;
+    }
+
+    setIsVerifyingImap(true);
+    setImapVerifyStatus(null);
+
+    const defaultImapHost =
+      selectedProvider === 'gmail'
+        ? 'imap.gmail.com'
+        : selectedProvider === 'outlook'
+        ? 'outlook.office365.com'
+        : selectedProvider === 'zoho'
+        ? 'imap.zoho.com'
+        : host.trim();
+
+    try {
+      const res = await fetch('/api/email/verify-imap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host: defaultImapHost,
+          port: 993,
+          secure: true,
+          user: email.trim(),
+          pass: appPassword.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setImapVerifyStatus({
+          success: true,
+          message: data.message || `IMAP connection verified on ${defaultImapHost}:993 (${data.totalMessages || 0} messages in INBOX).`,
+        });
+      } else {
+        setImapVerifyStatus({
+          success: false,
+          message: data.error || 'Failed to authenticate via IMAP.',
+        });
+      }
+    } catch (err: any) {
+      setImapVerifyStatus({
+        success: false,
+        message: err?.message || 'Failed to connect to IMAP service.',
+      });
+    } finally {
+      setIsVerifyingImap(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !senderName.trim()) return;
+
+    const defaultImapHost =
+      selectedProvider === 'gmail'
+        ? 'imap.gmail.com'
+        : selectedProvider === 'outlook'
+        ? 'outlook.office365.com'
+        : selectedProvider === 'zoho'
+        ? 'imap.zoho.com'
+        : host.trim();
 
     const smtpConfig: SmtpConfig = {
       host: host.trim() || currentPreset.defaultHost,
@@ -251,6 +323,18 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
       pass: appPassword.trim(),
       isVerified: verifyStatus?.success || false,
       lastVerifiedAt: verifyStatus?.success ? Date.now() : undefined,
+      imapHost: defaultImapHost,
+      imapPort: 993,
+    };
+
+    const imapConfig = {
+      host: defaultImapHost,
+      port: 993,
+      secure: true,
+      user: email.trim().toLowerCase(),
+      pass: appPassword.trim(),
+      isVerified: imapVerifyStatus?.success || false,
+      lastSyncedAt: Date.now(),
     };
 
     addAccount({
@@ -263,6 +347,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
       warmupScore: 100,
       provider: selectedProvider,
       smtpConfig,
+      imapConfig,
     });
 
     onClose();
@@ -530,34 +615,56 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
               </div>
             </div>
 
-            {/* Live Connection Test Button */}
-            <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={handleTestConnection}
-                disabled={isVerifying || !email.trim() || !appPassword.trim()}
-                className="text-xs py-2 px-3.5 self-start"
-              >
-                {isVerifying ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Testing handshake...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="h-3.5 w-3.5 text-[var(--accent)]" />
-                    <span>Test SMTP connection</span>
-                  </>
-                )}
-              </Button>
+            {/* Live Connection Test Buttons: SMTP & IMAP */}
+            <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={handleTestConnection}
+                  disabled={isVerifying || !email.trim() || !appPassword.trim()}
+                  className="text-xs py-2 px-3.5"
+                >
+                  {isVerifying ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Testing SMTP...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-3.5 w-3.5 text-[var(--accent)]" />
+                      <span>Test SMTP connection</span>
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={handleTestImapConnection}
+                  disabled={isVerifyingImap || !email.trim() || !appPassword.trim()}
+                  className="text-xs py-2 px-3.5"
+                >
+                  {isVerifyingImap ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Testing IMAP...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-3.5 w-3.5 text-indigo-400" />
+                      <span>Test IMAP inbound</span>
+                    </>
+                  )}
+                </Button>
+              </div>
 
               <span className="text-[12px] text-[var(--text-secondary)]">
-                Verifies direct TLS connection with {host || 'server'}
+                Handshakes tested over SSL/TLS
               </span>
             </div>
 
-            {/* Test result status banner */}
+            {/* SMTP Test result status banner */}
             {verifyStatus && (
               <div className="p-3 rounded-[10px] border border-[var(--border)] text-xs flex items-center gap-2 text-[var(--text-primary)]">
                 {verifyStatus.success ? (
@@ -565,7 +672,19 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ onClose }) => 
                 ) : (
                   <AlertCircle className="h-4 w-4 shrink-0 text-[var(--warning)]" />
                 )}
-                <span>{verifyStatus.message}</span>
+                <span><strong>SMTP:</strong> {verifyStatus.message}</span>
+              </div>
+            )}
+
+            {/* IMAP Test result status banner */}
+            {imapVerifyStatus && (
+              <div className="p-3 rounded-[10px] border border-[var(--border)] text-xs flex items-center gap-2 text-[var(--text-primary)]">
+                {imapVerifyStatus.success ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--success)]" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 shrink-0 text-[var(--warning)]" />
+                )}
+                <span><strong>IMAP:</strong> {imapVerifyStatus.message}</span>
               </div>
             )}
           </div>

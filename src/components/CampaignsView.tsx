@@ -38,7 +38,6 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({
     createCampaign,
     toggleCampaignStatus,
     deleteCampaign,
-    deleteMarkedCampaigns,
     clearMockData,
     loadSampleMockData,
     duplicateCampaign,
@@ -49,34 +48,11 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused'>('all');
-  const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
-  };
-
-  const handleToggleSelectCampaign = (id: string) => {
-    setSelectedCampaignIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
-
-  const handleToggleSelectAllCampaigns = () => {
-    if (selectedCampaignIds.length === filteredCampaigns.length && filteredCampaigns.length > 0) {
-      setSelectedCampaignIds([]);
-    } else {
-      setSelectedCampaignIds(filteredCampaigns.map((c) => c.id));
-    }
-  };
-
-  const handleRemoveMarkedCampaigns = () => {
-    if (selectedCampaignIds.length === 0) return;
-    const count = selectedCampaignIds.length;
-    deleteMarkedCampaigns(selectedCampaignIds);
-    setSelectedCampaignIds([]);
-    showToast(`Removed ${count} marked ${count === 1 ? 'campaign' : 'campaigns'}`);
   };
 
   // If a campaign is open in 5-tab view, render CampaignDetailView
@@ -273,49 +249,12 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({
             })}
           </div>
 
-          {filteredCampaigns.length > 0 && (
-            <button
-              type="button"
-              onClick={handleToggleSelectAllCampaigns}
-              className={`px-3 py-1.5 rounded-[8px] text-xs font-medium border-2 transition-all duration-150 cursor-pointer ${
-                selectedCampaignIds.length > 0 && selectedCampaignIds.length === filteredCampaigns.length
-                  ? 'border-[var(--accent)] bg-[rgba(91,141,239,0.12)] text-[var(--accent)]'
-                  : 'border-[var(--border)] bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-secondary)]/50'
-              }`}
-            >
-              {selectedCampaignIds.length === filteredCampaigns.length ? 'Deselect all' : 'Select all'}
-            </button>
-          )}
         </div>
 
         <span className="text-[13px] text-[var(--text-secondary)] tabular-nums self-center">
           Showing {filteredCampaigns.length} of {campaigns.length} campaigns
         </span>
       </div>
-
-      {/* Bulk Marked Action Bar */}
-      {selectedCampaignIds.length > 0 && (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold tabular-nums px-2.5 py-1 rounded-[8px] bg-[rgba(91,141,239,0.12)] text-[var(--accent)]">
-              {selectedCampaignIds.length} marked
-            </span>
-            <span className="text-sm text-[var(--text-primary)]">
-              {selectedCampaignIds.length} {selectedCampaignIds.length === 1 ? 'campaign selected' : 'campaigns selected'}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={handleRemoveMarkedCampaigns}>
-              <Trash2 className="h-4 w-4" />
-              <span>Remove marked</span>
-            </Button>
-            <Button variant="secondary" onClick={() => setSelectedCampaignIds([])}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Campaigns List: ONE CARD wrapping the whole list, 1px dividers between rows */}
       {filteredCampaigns.length === 0 ? (
@@ -336,17 +275,11 @@ export const CampaignsView: React.FC<CampaignsViewProps> = ({
             const campOpens = camp.leads.filter((l) => l.openedCount > 0).length;
             const openPct = campSent > 0 ? ((campOpens / campSent) * 100).toFixed(0) : '0';
             const replyPct = campSent > 0 ? ((campReplies / campSent) * 100).toFixed(0) : '0';
-            const isMarked = selectedCampaignIds.includes(camp.id);
-
             return (
               <ListRow key={camp.id} className="p-0">
                 <div
-                  onClick={() => handleToggleSelectCampaign(camp.id)}
-                  className={`p-4 rounded-[12px] border-2 transition-all duration-150 cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${
-                    isMarked
-                      ? 'border-[var(--accent)] bg-[rgba(91,141,239,0.08)] shadow-[0_0_0_1px_rgba(91,141,239,0.2)]'
-                      : 'border-transparent hover:border-[var(--border)] hover:bg-white/[0.02]'
-                  }`}
+                  onClick={() => setActiveCampaignDetailId(camp.id)}
+                  className="p-4 rounded-[12px] border border-transparent hover:border-[var(--border)] hover:bg-white/[0.02] transition-all duration-150 cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4"
                 >
                   {/* Left: Title + Meta */}
                   <div className="flex items-start gap-3 flex-1 min-w-0">

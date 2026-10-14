@@ -128,6 +128,7 @@ export async function syncCampaignsToSupabase(campaigns: Campaign[]): Promise<{ 
       daily_limit: c.dailyLimit,
       schedule_window: c.scheduleWindow,
       sequence_steps: c.sequenceSteps,
+      leads: c.leads,
       stats: c.stats,
       updated_at: new Date().toISOString(),
     }));
@@ -148,4 +149,104 @@ export async function syncCampaignsToSupabase(campaigns: Campaign[]): Promise<{ 
     return { success: false, message: err?.message || 'Sync failed' };
   }
 }
+
+export async function syncAccountsToSupabase(accounts: GmailAccount[]): Promise<{ success: boolean; message: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, message: 'Supabase client not configured.' };
+  }
+
+  try {
+    const accountRows = accounts.map((a) => ({
+      id: a.id,
+      email: a.email,
+      sender_name: a.senderName,
+      avatar: a.avatar,
+      color: a.color,
+      status: a.status,
+      daily_limit: a.dailyLimit,
+      sent_today: a.sentToday,
+      warmup_score: a.warmupScore,
+      provider: a.provider,
+      signature: a.signature || '',
+      smtp_config: a.smtpConfig || null,
+      imap_config: a.imapConfig || null,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await client.from('accounts').upsert(accountRows, { onConflict: 'id' });
+    if (error) {
+      if (error.code === '42P01') {
+        return { success: false, message: 'Table "accounts" does not exist in Supabase. Run SQL schema from Settings.' };
+      }
+      return { success: false, message: error.message };
+    }
+
+    return { success: true, message: `Successfully synchronized ${accounts.length} sending accounts to Supabase!` };
+  } catch (err: any) {
+    return { success: false, message: err?.message || 'Accounts sync failed' };
+  }
+}
+
+export async function loadCampaignsFromSupabase(): Promise<Campaign[] | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client.from('campaigns').select('*').order('created_at', { ascending: false });
+    if (error || !data) return null;
+
+    return data.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      assignedAccountId: row.assigned_account_id,
+      assignedAccountIds: row.assigned_account_ids || [row.assigned_account_id],
+      dailyLimit: row.daily_limit || 50,
+      scheduleWindow: row.schedule_window || { startTime: '08:00', endTime: '22:00', timezone: 'UTC', days: [1, 2, 3, 4, 5] },
+      sequenceSteps: row.sequence_steps || [],
+      leads: row.leads || [],
+      stats: row.stats || { totalLeads: 0, sent: 0, opened: 0, replied: 0, bounced: 0, botFiltered: 0 },
+      minDelayMinutes: row.min_delay_minutes ?? 2,
+      maxDelayMinutes: row.max_delay_minutes ?? 5,
+      createdAt: row.created_at,
+    }));
+  } catch (e) {
+    console.warn('Failed to load campaigns from Supabase:', e);
+    return null;
+  }
+}
+
+export async function loadAccountsFromSupabase(): Promise<GmailAccount[] | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client.from('accounts').select('*');
+    if (error || !data) return null;
+
+    return data.map((row: any) => ({
+      id: row.id,
+      email: row.email,
+      senderName: row.sender_name,
+      avatar: row.avatar || '',
+      color: row.color || '#5B8DEF',
+      status: row.status || 'active',
+      dailyLimit: row.daily_limit || 50,
+      sentToday: row.sent_today || 0,
+      warmupScore: row.warmup_score || 100,
+      unreadReplies: 0,
+      dueFollowUps: 0,
+      provider: row.provider || 'custom_smtp',
+      signature: row.signature || '',
+      smtpConfig: row.smtp_config || undefined,
+      imapConfig: row.imap_config || undefined,
+      connectedAt: row.created_at || new Date().toISOString(),
+    }));
+  } catch (e) {
+    console.warn('Failed to load accounts from Supabase:', e);
+    return null;
+  }
+}
+
 

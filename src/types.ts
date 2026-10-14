@@ -8,6 +8,16 @@ export type LeadStatus =
   | 'completed'          // finished all sequence steps
   | 'paused';
 
+export interface ImapConfig {
+  host: string;
+  port: number;
+  secure?: boolean;
+  user: string;
+  pass: string;
+  isVerified?: boolean;
+  lastSyncedAt?: number;
+}
+
 export interface SmtpConfig {
   host: string;
   port: number;
@@ -16,6 +26,8 @@ export interface SmtpConfig {
   pass: string;
   isVerified?: boolean;
   lastVerifiedAt?: number;
+  imapHost?: string;
+  imapPort?: number;
 }
 
 export interface GmailAccount {
@@ -33,6 +45,7 @@ export interface GmailAccount {
   provider: 'gmail' | 'workspace' | 'outlook' | 'zoho' | 'custom_smtp';
   signature?: string;
   smtpConfig?: SmtpConfig;
+  imapConfig?: ImapConfig;
   connectedAt: string;
 }
 

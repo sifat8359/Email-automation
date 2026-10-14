@@ -9,6 +9,12 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
+  Play,
+  Pause,
+  Zap,
+  Activity,
+  Clock,
+  ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import {
@@ -35,6 +41,11 @@ export const SettingsView: React.FC<{
     deleteAccount,
     clearMockData,
     loadSampleMockData,
+    schedulerStatus,
+    triggerSchedulerNow,
+    toggleServerScheduler,
+    syncAllImapMailboxes,
+    isImapSyncing,
   } = useApp();
 
   // Supabase Form state
@@ -46,6 +57,8 @@ export const SettingsView: React.FC<{
   const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
   const [showSqlSchema, setShowSqlSchema] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [isTriggeringScheduler, setIsTriggeringScheduler] = useState(false);
+  const [schedulerFeedback, setSchedulerFeedback] = useState<string | null>(null);
 
   // Mailbox inline edit
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -87,14 +100,25 @@ export const SettingsView: React.FC<{
     setSyncResult(res);
   };
 
+  const handleTriggerScheduler = async () => {
+    setIsTriggeringScheduler(true);
+    setSchedulerFeedback(null);
+    const res = await triggerSchedulerNow();
+    setIsTriggeringScheduler(false);
+    setSchedulerFeedback(res.message);
+    setTimeout(() => setSchedulerFeedback(null), 4000);
+  };
+
   const SQL_SCHEMA = `-- Instantly Cold Outreach Database Schema for Supabase
 CREATE TABLE IF NOT EXISTS campaigns (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   status TEXT DEFAULT 'active',
   assigned_account_id TEXT,
+  assigned_account_ids JSONB DEFAULT '[]',
   schedule_window JSONB,
   sequence_steps JSONB DEFAULT '[]',
+  leads JSONB DEFAULT '[]',
   stats JSONB DEFAULT '{}',
   daily_limit INT DEFAULT 50,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -109,6 +133,8 @@ CREATE TABLE IF NOT EXISTS leads (
   email TEXT NOT NULL,
   company_name TEXT,
   website TEXT,
+  title TEXT,
+  phone TEXT,
   status TEXT DEFAULT 'ready_for_outreach',
   current_step_index INT DEFAULT 0,
   history JSONB DEFAULT '[]',
@@ -131,18 +157,38 @@ CREATE TABLE IF NOT EXISTS accounts (
   sent_today INT DEFAULT 0,
   warmup_score INT DEFAULT 100,
   provider TEXT,
+  signature TEXT,
   smtp_config JSONB,
+  imap_config JSONB,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS email_messages (
+  id TEXT PRIMARY KEY,
+  lead_id TEXT,
+  account_id TEXT,
+  direction TEXT,
+  sender_email TEXT,
+  recipient_email TEXT,
+  subject TEXT,
+  body TEXT,
+  timestamp BIGINT,
+  step_index INT,
+  status TEXT,
+  read BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE email_messages ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow anon read and write on campaigns" ON campaigns FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "Allow anon read and write on leads" ON leads FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "Allow anon read and write on accounts" ON accounts FOR ALL TO anon USING (true) WITH CHECK (true);`;
+CREATE POLICY "Allow anon read and write on accounts" ON accounts FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Allow anon read and write on email_messages" ON email_messages FOR ALL TO anon USING (true) WITH CHECK (true);`;
 
   const handleCopySql = () => {
     navigator.clipboard.writeText(SQL_SCHEMA);
@@ -157,6 +203,164 @@ CREATE POLICY "Allow anon read and write on accounts" ON accounts FOR ALL TO ano
         title="Settings & database"
         subtitle="Configure Supabase database connection, sender mailboxes, and outreach limits."
       />
+
+      {/* Feedback banner */}
+      {schedulerFeedback && (
+        <div className="flex items-center gap-2 p-3.5 rounded-[10px] bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span>{schedulerFeedback}</span>
+        </div>
+      )}
+
+      {/* Section 0: Autonomous 24/7 Background Scheduler Engine */}
+      <Card className="space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+          <SectionHeader
+            title="Autonomous 24/7 background scheduler engine"
+            subtitle="Runs headlessly in the Node.js backend to dispatch sequences, respect cooldowns, and sync replies even when the browser is closed."
+          />
+          <div className="flex items-center gap-2">
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${
+                schedulerStatus?.isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+              }`}
+            />
+            <StatusPill
+              variant={schedulerStatus?.isRunning ? 'success' : 'warning'}
+              label={schedulerStatus?.isRunning ? 'Engine 24/7 active' : 'Engine paused'}
+            />
+          </div>
+        </div>
+
+        {/* 4-Stat Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="p-3.5 rounded-[10px] bg-white/[0.02] border border-[var(--border)]">
+            <span className="text-[11px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">
+              Active Campaigns
+            </span>
+            <p className="text-xl font-bold text-[var(--text-primary)] mt-1">
+              {schedulerStatus?.activeCampaignsCount ?? campaigns.filter((c) => c.status === 'active').length}
+            </p>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">dispatching sequences</p>
+          </div>
+
+          <div className="p-3.5 rounded-[10px] bg-white/[0.02] border border-[var(--border)]">
+            <span className="text-[11px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">
+              Queued Leads
+            </span>
+            <p className="text-xl font-bold text-indigo-400 mt-1">
+              {schedulerStatus?.queuedLeadsCount ?? 0}
+            </p>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">awaiting send or follow-up</p>
+          </div>
+
+          <div className="p-3.5 rounded-[10px] bg-white/[0.02] border border-[var(--border)]">
+            <span className="text-[11px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">
+              Tick Interval
+            </span>
+            <p className="text-xl font-bold text-emerald-400 mt-1">10s</p>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">continuous check cycle</p>
+          </div>
+
+          <div className="p-3.5 rounded-[10px] bg-white/[0.02] border border-[var(--border)]">
+            <span className="text-[11px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">
+              Last Server Tick
+            </span>
+            <p className="text-xs font-semibold text-[var(--text-primary)] mt-2 tabular-nums">
+              {schedulerStatus?.lastTickAt ? new Date(schedulerStatus.lastTickAt).toLocaleTimeString() : 'Active now'}
+            </p>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">background worker</p>
+          </div>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={handleTriggerScheduler}
+              disabled={isTriggeringScheduler}
+              className="text-xs py-1.5 px-3"
+            >
+              <Zap className={`h-3.5 w-3.5 text-amber-400 ${isTriggeringScheduler ? 'animate-bounce' : ''}`} />
+              <span>{isTriggeringScheduler ? 'Dispatching...' : 'Trigger dispatch cycle now'}</span>
+            </Button>
+
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => toggleServerScheduler()}
+              className="text-xs py-1.5 px-3"
+            >
+              {schedulerStatus?.isRunning ? (
+                <>
+                  <Pause className="h-3.5 w-3.5 text-zinc-400" />
+                  <span>Pause 24/7 engine</span>
+                </>
+              ) : (
+                <>
+                  <Play className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Resume 24/7 engine</span>
+                </>
+              )}
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={async () => {
+                const res = await syncAllImapMailboxes();
+                setSchedulerFeedback(res.message);
+                setTimeout(() => setSchedulerFeedback(null), 4000);
+              }}
+              disabled={isImapSyncing}
+              className="text-xs py-1.5 px-3"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-indigo-400 ${isImapSyncing ? 'animate-spin' : ''}`} />
+              <span>{isImapSyncing ? 'Syncing...' : 'Run live IMAP sync'}</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Live Background Activity Log */}
+        {schedulerStatus?.logs && schedulerStatus.logs.length > 0 && (
+          <div className="space-y-2 pt-2 border-t border-[var(--border)]">
+            <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
+              <span className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+                <Activity className="h-3.5 w-3.5 text-indigo-400" />
+                <span>Headless Background Dispatch Log</span>
+              </span>
+              <span className="text-[11px] tabular-nums">Showing latest events</span>
+            </div>
+            <div className="max-h-44 overflow-y-auto rounded-[8px] bg-[#0A0D12] border border-[var(--border)] p-2.5 font-mono text-[11px] space-y-1.5 no-scrollbar">
+              {schedulerStatus.logs.slice(0, 8).map((log) => (
+                <div key={log.id} className="flex items-start gap-2 leading-relaxed">
+                  <span className="text-zinc-500 shrink-0 tabular-nums">
+                    {new Date(log.timestamp).toLocaleTimeString()}
+                  </span>
+                  <span
+                    className={`shrink-0 uppercase px-1 py-0.2 rounded text-[9px] font-bold ${
+                      log.status === 'success'
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : log.status === 'error'
+                        ? 'bg-rose-500/20 text-rose-400'
+                        : log.status === 'warning'
+                        ? 'bg-amber-500/20 text-amber-400'
+                        : 'bg-indigo-500/20 text-indigo-400'
+                    }`}
+                  >
+                    {log.type.replace('_', ' ')}
+                  </span>
+                  <span className="text-zinc-300 break-all">{log.message}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Section 1: Supabase Database Integration */}
       <Card className="space-y-5">

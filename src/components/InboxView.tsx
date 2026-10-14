@@ -29,6 +29,9 @@ export const InboxView: React.FC<{
     sendInboxReply,
     updateLeadStatus,
     deleteCampaignLead,
+    syncAllImapMailboxes,
+    isImapSyncing,
+    lastImapSyncAt,
   } = useApp();
 
   const [filterMode, setFilterMode] = useState<'all' | 'interested' | 'replied' | 'unread'>('replied');
@@ -42,6 +45,11 @@ export const InboxView: React.FC<{
   const [isSending, setIsSending] = useState(false);
   const [isComposerExpanded, setIsComposerExpanded] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleSyncImap = async () => {
+    const res = await syncAllImapMailboxes();
+    showToast(res.message);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -134,10 +142,22 @@ export const InboxView: React.FC<{
         title="Unibox"
         subtitle="Manage inbound responses across all connected email accounts and cold outreach campaigns."
         action={
-          <Button variant="secondary" onClick={() => showToast('Inbox refreshed')}>
-            <RotateCw className="h-4 w-4" />
-            <span>Refresh</span>
-          </Button>
+          <div className="flex items-center gap-3">
+            {lastImapSyncAt && (
+              <span className="text-[11px] text-[var(--text-secondary)] hidden sm:inline tabular-nums">
+                Last IMAP sync: {new Date(lastImapSyncAt).toLocaleTimeString()}
+              </span>
+            )}
+            <Button
+              variant="primary"
+              onClick={handleSyncImap}
+              disabled={isImapSyncing}
+              className="text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
+            >
+              <RotateCw className={`h-3.5 w-3.5 ${isImapSyncing ? 'animate-spin' : ''}`} />
+              <span>{isImapSyncing ? 'Syncing IMAP...' : 'Sync Live IMAP'}</span>
+            </Button>
+          </div>
         }
       />
 

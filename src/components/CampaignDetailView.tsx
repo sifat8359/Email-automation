@@ -88,6 +88,7 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
     simulateLeadOpen,
     accountNextAllowedSendTime,
     resetAccountCooldown,
+    triggerSchedulerNow,
   } = useApp();
 
   const campaign = campaigns.find((c) => c.id === campaignId) || campaigns[0];
@@ -99,8 +100,10 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
     return () => clearInterval(t);
   }, []);
 
-  // 5 Instantly Tabs - defaults to Leads when opening a campaign
-  const [activeTab, setActiveTab] = useState<'analytics' | 'leads' | 'sequences' | 'schedule' | 'options'>(initialTab);
+  // Tabs - defaults to Leads with top analytics metrics
+  const [activeTab, setActiveTab] = useState<'analytics' | 'leads' | 'sequences' | 'schedule' | 'options'>(
+    initialTab === 'analytics' ? 'leads' : initialTab
+  );
 
   // Email account selector dropdown state
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
@@ -361,6 +364,19 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+          {/* Dispatch Next Due Now */}
+          <button
+            onClick={async () => {
+              const res = await triggerSchedulerNow();
+              showFeedback(res.message);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30"
+            title="Trigger headless sequence dispatcher immediately"
+          >
+            <Zap className="h-3.5 w-3.5 text-amber-400" />
+            <span>Dispatch Next Due</span>
+          </button>
+
           {/* Active / Paused Toggle */}
           <button
             onClick={() => {
@@ -388,13 +404,12 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
         </div>
       </div>
 
-      {/* Signature Instantly 5 Tabs Navigation Bar */}
+      {/* Tabs Navigation Bar */}
       <div className="border-b border-[#1b233a] flex items-center gap-1 sm:gap-2 overflow-x-auto pb-1 no-scrollbar">
         {[
           { id: 'leads', label: `Leads (${campaign.leads.length})`, icon: Users },
           { id: 'sequences', label: `Sequences (${campaign.sequenceSteps.length})`, icon: GitBranch },
           { id: 'schedule', label: 'Schedule', icon: Clock },
-          { id: 'analytics', label: 'Analytics', icon: BarChart3 },
           { id: 'options', label: 'Setting', icon: Settings },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -418,11 +433,11 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
 
       {/* TAB CONTENT AREAS */}
 
-      {/* 1. ANALYTICS TAB */}
-      {activeTab === 'analytics' && (
-        <div className="space-y-6 animate-fade-in">
-          {/* Top 5 KPI Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+      {/* LEADS & ANALYTICS TAB */}
+      {(activeTab === 'leads' || activeTab === 'analytics') && (
+        <div className="space-y-4 animate-fade-in">
+          {/* Top Analytics KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
             <div className="bg-[#111728] border border-[#1d2742] rounded-2xl p-4">
               <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">TOTAL LEADS</span>
               <p className="text-2xl font-extrabold text-white mt-1.5">{totalLeads}</p>
@@ -455,10 +470,10 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
               <p className="text-[11px] text-zinc-500 mt-1">high intent replies</p>
             </div>
 
-            <div className="bg-[#111728] border border-[#1d2742] rounded-2xl p-4 col-span-2 md:col-span-1">
+            <div className="bg-[#111728] border border-[#1d2742] rounded-2xl p-4">
               <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
                 <ShieldCheck className="h-3 w-3 text-cyan-400" />
-                <span>BOT SCANS FILTERED</span>
+                <span>BOT SCANS</span>
               </span>
               <p className="text-2xl font-extrabold text-cyan-400 mt-1.5">
                 {campaign.stats.botFiltered || 0}
@@ -467,118 +482,6 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
             </div>
           </div>
 
-          {/* Sequence Funnel Drop-off Chart */}
-          <div className="bg-[#111728] border border-[#1d2742] rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-white">Sequence Performance & Drop-Off Funnel</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Performance across each step in your outreach sequence
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              {campaign.sequenceSteps.map((step, idx) => {
-                const stepSentCount = campaign.leads.filter(
-                  (l) => l.currentStepIndex >= idx && l.status !== 'ready_for_outreach'
-                ).length;
-                const stepRepliedCount = campaign.leads.filter(
-                  (l) => l.status === 'replied' && l.currentStepIndex === idx + 1
-                ).length;
-                const percentage = totalLeads > 0 ? (stepSentCount / totalLeads) * 100 : 0;
-
-                return (
-                  <div key={step.id} className="p-3.5 rounded-xl bg-[#0a0e19] border border-[#182138] space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="h-5 w-5 rounded-md bg-indigo-500/20 text-indigo-300 font-bold flex items-center justify-center text-[10px]">
-                          #{step.stepNumber}
-                        </span>
-                        <span className="font-semibold text-zinc-200 truncate max-w-[280px] sm:max-w-md">
-                          {step.stepNumber === 1 ? 'Initial Cold Email' : `Follow-up #${step.stepNumber - 1}`}
-                          <span className="text-zinc-500 font-normal ml-2">({step.subject})</span>
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-zinc-300">
-                        <span><strong>{stepSentCount}</strong> sent</span>
-                        <span><strong>{stepRepliedCount}</strong> replies</span>
-                      </div>
-                    </div>
-
-                    {/* Progress bar */}
-                    <div className="w-full bg-[#141b2c] h-2 rounded-full overflow-hidden">
-                      <div
-                        className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, percentage)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Activity Log Feed */}
-          <div className="bg-[#111728] border border-[#1d2742] rounded-2xl p-5 space-y-4 shadow-xl">
-            <h3 className="text-sm font-bold text-white">Recent Campaign Dispatch Feed</h3>
-            <div className="space-y-2">
-              {campaign.leads.flatMap((l) => l.history).length === 0 ? (
-                <p className="text-xs text-zinc-500 py-4 text-center">
-                  No outreach emails dispatched yet. Activate the campaign to begin automated sequence delivery according to your schedule.
-                </p>
-              ) : (
-                campaign.leads
-                  .flatMap((l) =>
-                    l.history.map((msg) => ({
-                      ...msg,
-                      leadName: `${l.firstName} ${l.lastName}`,
-                      company: l.companyName,
-                    }))
-                  )
-                  .sort((a, b) => b.timestamp - a.timestamp)
-                  .slice(0, 8)
-                  .map((item) => (
-                    <div
-                      key={item.id}
-                      className="p-3 rounded-xl bg-[#0b0f1b] border border-[#172036] flex items-center justify-between text-xs"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`h-8 w-8 rounded-lg flex items-center justify-center ${
-                            item.direction === 'inbound'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                          }`}
-                        >
-                          {item.direction === 'inbound' ? (
-                            <MessageSquare className="h-4 w-4" />
-                          ) : (
-                            <Send className="h-4 w-4" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-zinc-200">
-                            {item.direction === 'inbound' ? 'Reply received from' : 'Dispatched to'}{' '}
-                            <span className="text-indigo-400">{item.leadName}</span> ({item.company})
-                          </p>
-                          <p className="text-zinc-500 text-[11px] truncate max-w-sm sm:max-w-md">
-                            {item.subject}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-[11px] text-zinc-500">{formatFullDate(item.timestamp)}</span>
-                    </div>
-                  ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 2. LEADS TAB */}
-      {activeTab === 'leads' && (
-        <div className="space-y-4 animate-fade-in">
           {/* Action Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#0f1422] border border-[#1b233a] p-3.5 rounded-2xl shadow-xl">
             {/* Search and Filters */}

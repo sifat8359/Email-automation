@@ -81,6 +81,14 @@ interface AppContextType {
   markAllNotificationsAsRead: () => void;
   clearNotifications: () => void;
 
+  // Live IMAP Inbound Sync & Backend Scheduler
+  syncAllImapMailboxes: () => Promise<{ success: boolean; newRepliesCount: number; message: string }>;
+  isImapSyncing: boolean;
+  lastImapSyncAt: number | null;
+  schedulerStatus: { isRunning: boolean; activeCampaignsCount: number; queuedLeadsCount: number; lastTickAt: number; logs: any[] } | null;
+  triggerSchedulerNow: () => Promise<{ success: boolean; message: string }>;
+  toggleServerScheduler: () => Promise<void>;
+
   // Backward-compatibility helpers
   dueCountsByAccount: Record<string, number>;
   replyCountsByAccount: Record<string, number>;
@@ -192,6 +200,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [accountNextAllowedSendTime, setAccountNextAllowedSendTime] = useState<Record<string, number>>({});
   // Per-campaign sender mailbox rotation index: campaignId -> current account index
   const [campaignRotationIndices, setCampaignRotationIndices] = useState<Record<string, number>>({});
+
+  // Live IMAP Inbound Sync & Backend Scheduler status
+  const [isImapSyncing, setIsImapSyncing] = useState<boolean>(false);
+  const [lastImapSyncAt, setLastImapSyncAt] = useState<number | null>(null);
+  const [schedulerStatus, setSchedulerStatus] = useState<{
+    isRunning: boolean;
+    activeCampaignsCount: number;
+    queuedLeadsCount: number;
+    lastTickAt: number;
+    logs: any[];
+  } | null>(null);
 
   const resetAccountCooldown = useCallback((accountId: string) => {
     setAccountNextAllowedSendTime((prev) => {
@@ -1171,6 +1190,195 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, []);
 
+  // Autonomous headless server synchronization
+  useEffect(() => {
+    fetch('/api/scheduler/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaigns, accounts }),
+    }).catch(() => {});
+  }, [campaigns, accounts]);
+
+  // Periodic polling for scheduler status
+  const fetchSchedulerStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/scheduler/status');
+      if (res.ok) {
+        const data = await res.json();
+        setSchedulerStatus(data);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSchedulerStatus();
+    const interval = setInterval(fetchSchedulerStatus, 10000);
+    return () => clearInterval(interval);
+  }, [fetchSchedulerStatus]);
+
+  const triggerSchedulerNow = useCallback(async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await fetch('/api/scheduler/trigger-now', { method: 'POST' });
+      const data = await res.json();
+      await fetchSchedulerStatus();
+      return { success: data.success, message: data.message || 'Scheduler tick executed.' };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to trigger scheduler.' };
+    }
+  }, [fetchSchedulerStatus]);
+
+  const toggleServerScheduler = useCallback(async (): Promise<void> => {
+    try {
+      const nextState = !schedulerStatus?.isRunning;
+      const res = await fetch('/api/scheduler/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isRunning: nextState }),
+      });
+      if (res.ok) {
+        await fetchSchedulerStatus();
+      }
+    } catch {
+      // ignore
+    }
+  }, [schedulerStatus, fetchSchedulerStatus]);
+
+  // Live IMAP Inbound Sync across connected mailboxes
+  const syncAllImapMailboxes = useCallback(async (): Promise<{ success: boolean; newRepliesCount: number; message: string }> => {
+    setIsImapSyncing(true);
+    let totalNewReplies = 0;
+    const allLeadEmails = allLeads.map((l) => l.email.toLowerCase().trim());
+
+    try {
+      for (const account of accounts) {
+        const imapConf =
+          account.imapConfig ||
+          (account.smtpConfig
+            ? {
+                host:
+                  account.smtpConfig.imapHost ||
+                  (account.provider === 'gmail' || account.provider === 'workspace'
+                    ? 'imap.gmail.com'
+                    : account.provider === 'outlook'
+                    ? 'outlook.office365.com'
+                    : account.provider === 'zoho'
+                    ? 'imap.zoho.com'
+                    : account.smtpConfig.host),
+                port: account.smtpConfig.imapPort || 993,
+                secure: true,
+                user: account.smtpConfig.user,
+                pass: account.smtpConfig.pass,
+              }
+            : null);
+
+        if (!imapConf || !imapConf.host || !imapConf.user || !imapConf.pass) {
+          continue;
+        }
+
+        const res = await fetch('/api/email/sync-imap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imapConfig: imapConf,
+            knownLeadEmails: allLeadEmails,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.matchedReplies && data.matchedReplies.length > 0) {
+            totalNewReplies += data.matchedReplies.length;
+
+            // Apply replies to campaigns
+            setCampaigns((prev) =>
+              prev.map((camp) => {
+                let campChanged = false;
+                const newLeads = camp.leads.map((lead) => {
+                  const match = data.matchedReplies.find(
+                    (r: any) => r.leadEmail.toLowerCase() === lead.email.toLowerCase()
+                  );
+                  if (match && lead.status !== 'replied') {
+                    campChanged = true;
+                    const inboundMsg: EmailMessage = {
+                      id: `imap-msg-${match.date || Date.now()}`,
+                      leadId: lead.id,
+                      accountId: account.id,
+                      accountEmail: account.email,
+                      direction: 'inbound',
+                      senderEmail: match.fromEmail || lead.email,
+                      recipientEmail: account.email,
+                      subject: match.subject || `Re: ${camp.name}`,
+                      body: match.bodySnippet || 'Inbound prospect response received via live IMAP sync.',
+                      timestamp: match.date || Date.now(),
+                      stepIndex: lead.currentStepIndex,
+                      status: 'replied',
+                      read: false,
+                    };
+
+                    addNotification(
+                      'reply_received',
+                      `Live IMAP Reply: ${lead.firstName} ${lead.lastName}`,
+                      `"${lead.companyName}" replied via email. Follow-up sequences have been automatically halted.`,
+                      account.id,
+                      account.email,
+                      lead.id
+                    );
+
+                    return {
+                      ...lead,
+                      status: 'replied' as LeadStatus,
+                      sentiment: 'interested' as const,
+                      nextFollowUpAt: null, // Halt followups!
+                      history: [...lead.history, inboundMsg],
+                    };
+                  }
+                  return lead;
+                });
+
+                if (!campChanged) return camp;
+
+                return {
+                  ...camp,
+                  leads: newLeads,
+                  stats: {
+                    ...camp.stats,
+                    replied: newLeads.filter((l) => l.status === 'replied').length,
+                  },
+                };
+              })
+            );
+          }
+        }
+      }
+
+      setLastImapSyncAt(Date.now());
+      setIsImapSyncing(false);
+
+      if (totalNewReplies > 0) {
+        return {
+          success: true,
+          newRepliesCount: totalNewReplies,
+          message: `Live IMAP sync complete: Ingested ${totalNewReplies} new prospect ${totalNewReplies === 1 ? 'reply' : 'replies'}. Active sequences halted!`,
+        };
+      }
+
+      return {
+        success: true,
+        newRepliesCount: 0,
+        message: 'All IMAP mailboxes checked. No new prospect replies found.',
+      };
+    } catch (e: any) {
+      setIsImapSyncing(false);
+      return {
+        success: false,
+        newRepliesCount: 0,
+        message: e?.message || 'Failed to sync with IMAP mailboxes.',
+      };
+    }
+  }, [accounts, allLeads, addNotification]);
+
   return (
     <AppContext.Provider
       value={{
@@ -1187,6 +1395,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unreadNotificationCount: notifications.filter((n) => !n.read).length,
         accountNextAllowedSendTime,
         resetAccountCooldown,
+        syncAllImapMailboxes,
+        isImapSyncing,
+        lastImapSyncAt,
+        schedulerStatus,
+        triggerSchedulerNow,
+        toggleServerScheduler,
         setActiveCampaignId,
         setSelectedAccountIdFilter,
         createCampaign,
