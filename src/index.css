@@ -1,42 +1,312 @@
 @import "tailwindcss";
 
+:root {
+  --bg: #0E1116;
+  --surface: #171B22;
+  --border: #262B35;
+  --text-primary: #F4F5F7;
+  --text-secondary: #8A93A3;
+  --accent: #5B8DEF;
+  --accent-hover: #4A7CE0;
+  --success: #34D399;
+  --warning: #F5A623;
+  --muted: #8A93A3;
+}
+
+@theme {
+  --color-bg: #0E1116;
+  --color-surface: #171B22;
+  --color-border: #262B35;
+  --color-text-primary: #F4F5F7;
+  --color-text-secondary: #8A93A3;
+  --color-accent: #5B8DEF;
+  --color-accent-hover: #4A7CE0;
+  --color-success: #34D399;
+  --color-warning: #F5A623;
+  --color-muted: #8A93A3;
+}
+
 @layer base {
-  body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    background-color: #090a0f;
-    color: #f1f5f9;
+  *, *::before, *::after {
+    border-color: var(--border);
+  }
+
+  html, body, #root {
+    background-color: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100vh;
+  }
+
+  /* Typography standard rules */
+  h1, .page-title {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--text-primary);
+  }
+
+  h2, .section-header {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--text-primary);
+  }
+
+  /* Tabular numerals for all numeric data */
+  .tabular-nums, [data-tabular="true"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Eliminate all caps globally */
+  .uppercase {
+    text-transform: none !important;
   }
 }
 
-/* Custom smooth dark scrollbar */
+/* Tab/page switch motion: 150-200ms opacity fade only, no slide/bounce */
+.tab-fade, .page-fade {
+  animation: pageFade 180ms ease-out forwards;
+}
+
+@keyframes pageFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Universal Card: background var(--surface), border 1px solid var(--border), border-radius 14px, padding 16-18px */
+.app-card {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  padding: 16px 18px !important;
+}
+
+/* Universal List Container: ONE card wrapping the whole list, 1px dividers between rows */
+.app-list-card {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+}
+
+.app-list-card > * + * {
+  border-top: 1px solid var(--border) !important;
+}
+
+.app-row {
+  padding: 14px 18px !important;
+  transition: background-color 150ms ease;
+}
+
+.app-row:hover {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+/* Primary Button: background var(--accent), dark text, border-radius 10px, padding 9px 16px, weight 600. Hover darkens ~8%, active scale(0.98) */
+.btn-primary {
+  background-color: var(--accent) !important;
+  color: #0E1116 !important;
+  border-radius: 10px !important;
+  padding: 9px 16px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  border: none !important;
+  transition: filter 150ms ease, transform 150ms ease;
+  user-select: none;
+}
+
+.btn-primary:hover {
+  filter: brightness(0.92) !important;
+}
+
+.btn-primary:active {
+  transform: scale(0.98) !important;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Secondary Button: transparent background, 1px var(--border), var(--text-primary) text */
+.btn-secondary {
+  background-color: transparent !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-primary) !important;
+  border-radius: 10px !important;
+  padding: 9px 16px !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 150ms ease, border-color 150ms ease;
+  user-select: none;
+}
+
+.btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.btn-secondary:active {
+  transform: scale(0.98) !important;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Inputs: background var(--surface), 1px var(--border), border-radius 10px, padding 10px 14px. Focus: border color var(--accent), no glow/shadow */
+.app-input {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  color: var(--text-primary) !important;
+  font-size: 14px !important;
+  width: 100%;
+  transition: border-color 150ms ease;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.app-input:focus {
+  border-color: var(--accent) !important;
+}
+
+.app-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+/* Status Indicator Pill: always a soft tinted pill — background = status color at 12% opacity, text = full status color, padding 4px 10px, border-radius 8px */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  border: none !important;
+}
+
+.status-pill-success {
+  background-color: rgba(52, 211, 153, 0.12) !important;
+  color: var(--success) !important;
+}
+
+.status-pill-warning {
+  background-color: rgba(245, 166, 35, 0.12) !important;
+  color: var(--warning) !important;
+}
+
+.status-pill-muted {
+  background-color: rgba(138, 147, 163, 0.12) !important;
+  color: var(--muted) !important;
+}
+
+.status-pill-accent {
+  background-color: rgba(91, 141, 239, 0.12) !important;
+  color: var(--accent) !important;
+}
+
+/* Motion: Skeleton Shimmer — linear-gradient(90deg, var(--surface) 25%, #1F2430 37%, var(--surface) 63%), background-size 400px 100%, 1.4s linear infinite sweep */
+@keyframes shimmerSweep {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--surface) 25%, #1F2430 37%, var(--surface) 63%) !important;
+  background-size: 400px 100% !important;
+  animation: shimmerSweep 1.4s linear infinite !important;
+  border-radius: 6px !important;
+}
+
+/* Fallback mappings for any legacy arbitrary background or border utilities to guarantee absolute consistency */
+.bg-\[\#0a0d17\],
+.bg-\[\#0a0c15\],
+.bg-\[\#090c15\],
+.bg-\[\#080b14\],
+.bg-zinc-950 {
+  background-color: var(--bg) !important;
+}
+
+.bg-\[\#0f1423\],
+.bg-\[\#0f1424\],
+.bg-\[\#171B22\],
+.bg-\[\#13192e\],
+.bg-\[\#141b2e\],
+.bg-\[\#12182b\],
+.bg-\[\#12182a\],
+.bg-\[\#121829\],
+.bg-\[\#182038\],
+.bg-\[\#0d1220\],
+.bg-\[\#0a0d18\],
+.bg-\[\#090d16\],
+.bg-\[\#0a0e19\],
+.bg-\[\#0c101d\],
+.bg-zinc-900,
+.bg-zinc-900\/50,
+.bg-slate-900 {
+  background-color: var(--surface) !important;
+}
+
+.border-\[\#1a2238\],
+.border-\[\#1b233a\],
+.border-\[\#1d2742\],
+.border-\[\#1f2a47\],
+.border-\[\#232e4d\],
+.border-\[\#1a233b\],
+.border-\[\#1d263f\],
+.border-\[\#212b48\],
+.border-\[\#182037\],
+.border-\[\#232f50\],
+.border-\[\#283556\],
+.border-\[\#243050\],
+.border-\[\#1a1e2f\],
+.border-zinc-800,
+.border-zinc-700,
+.border-slate-800 {
+  border-color: var(--border) !important;
+  border-width: 1px !important;
+}
+
+/* Custom minimal scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f1117;
+  background: var(--bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: var(--border);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
-}
-
-@keyframes pulseGlow {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-    box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.02);
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.7);
-  }
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 2.5s infinite ease-in-out;
+  background: #363d4a;
 }

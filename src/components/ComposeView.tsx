@@ -209,10 +209,10 @@ ${currentAccount?.senderName || 'Sifat'}`);
                             return prev;
                           });
                         }}
-                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
+                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all duration-150 cursor-pointer border-2 ${
                           isSelected
-                            ? 'bg-purple-600/15 border border-purple-500/40 text-white shadow-sm'
-                            : 'hover:bg-[#161a2e] text-zinc-300 border border-transparent'
+                            ? 'border-[var(--accent)] bg-[rgba(91,141,239,0.08)] text-white shadow-[0_0_0_1px_rgba(91,141,239,0.2)]'
+                            : 'hover:bg-white/[0.03] text-zinc-300 border-transparent'
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -233,14 +233,6 @@ ${currentAccount?.senderName || 'Sifat'}`);
                               Daily quota: {acc.sentToday} / {acc.dailyLimit} sent · {remaining} remaining
                             </div>
                           </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0 ml-2">
-                          {isSelected && (
-                            <span className="flex items-center gap-1 text-[11px] text-purple-400 font-medium">
-                              <Check className="h-4 w-4" />
-                            </span>
-                          )}
                         </div>
                       </button>
                     );

@@ -409,10 +409,10 @@ Best,
                     <div
                       key={acc.id}
                       onClick={() => setAssignedAccountId(acc.id)}
-                      className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                      className={`p-3 rounded-xl border-2 flex items-center justify-between cursor-pointer transition-all duration-150 ${
                         isSelected
-                          ? 'bg-purple-600/15 border-purple-500 text-white shadow-sm'
-                          : 'bg-[#080a13] border-[#1d233a] text-zinc-400 hover:text-white hover:border-[#2b3452]'
+                          ? 'bg-[rgba(91,141,239,0.08)] border-[var(--accent)] text-white shadow-[0_0_0_1px_rgba(91,141,239,0.2)]'
+                          : 'bg-transparent border-[var(--border)] text-zinc-400 hover:text-white hover:border-zinc-600'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 truncate">
@@ -425,7 +425,6 @@ Best,
                           <div className="text-[11px] font-mono text-zinc-400 truncate">{acc.email}</div>
                         </div>
                       </div>
-                      {isSelected && <Check className="h-4 w-4 text-purple-400" />}
                     </div>
                   );
                 })}

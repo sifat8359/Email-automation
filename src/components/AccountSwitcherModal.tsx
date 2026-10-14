@@ -67,10 +67,10 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
             return (
               <div
                 key={acc.id}
-                className={`p-3.5 rounded-xl border transition-all ${
+                className={`p-3.5 rounded-[12px] border-2 transition-all duration-150 ${
                   isSelected
-                    ? 'bg-indigo-950/20 border-indigo-500/60 shadow-sm'
-                    : 'bg-[#121829] border-[#1b233a] hover:border-zinc-700'
+                    ? 'bg-[rgba(91,141,239,0.08)] border-[var(--accent)] shadow-[0_0_0_1px_rgba(91,141,239,0.2)]'
+                    : 'bg-[#171B22] border-[var(--border)] hover:border-zinc-700'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -87,11 +87,6 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
                         <span className="font-semibold text-xs text-white leading-tight">
                           {acc.senderName}
                         </span>
-                        {isSelected && (
-                          <span className="text-[10px] font-bold text-indigo-400 flex items-center gap-0.5">
-                            <Check className="h-3 w-3" /> Selected
-                          </span>
-                        )}
                       </div>
                       <p className="text-[11px] text-zinc-400 font-mono mt-0.5">{acc.email}</p>
                     </div>

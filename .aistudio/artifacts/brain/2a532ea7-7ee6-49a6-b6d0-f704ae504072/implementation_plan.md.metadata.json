@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan to build a production-grade SMTP/IMAP email integration using an Express/Nodemailer backend proxy, provider presets (Google Workspace, Outlook, Zoho, Custom SMTP), credential verification testing, and live email sequence dispatching.",
+  "updatedAt": "2026-10-14T09:41:57.301433276Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

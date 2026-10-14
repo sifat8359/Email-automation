@@ -555,6 +555,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             nextFollowUpAt = Date.now() + delayMs;
           }
 
+          // If account has real SMTP configured, dispatch via backend nodemailer
+          if (senderAccount.smtpConfig?.host && senderAccount.smtpConfig?.pass) {
+            fetch('/api/email/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                smtpConfig: senderAccount.smtpConfig,
+                fromName: senderAccount.senderName,
+                fromEmail: senderAccount.email,
+                to: targetLead.email,
+                subject: renderedSubject,
+                body: renderedBody,
+              }),
+            })
+              .then(async (res) => {
+                const data = await res.json();
+                if (data.success) {
+                  console.log(`[SMTP Live Dispatch] Message ${data.messageId} sent to ${targetLead.email}`);
+                } else {
+                  console.warn(`[SMTP Dispatch Warning] ${data.error}`);
+                }
+              })
+              .catch((err) => console.error('[SMTP Send Network Error]', err));
+          }
+
           const updatedLead: Lead = {
             ...targetLead,
             status: 'outreach_sent',
@@ -570,10 +595,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             prevAccs.map((a) => (a.id === senderAccount.id ? { ...a, sentToday: a.sentToday + 1 } : a))
           );
 
+          const isLiveSmtp = Boolean(senderAccount.smtpConfig?.host && senderAccount.smtpConfig?.pass);
           addNotification(
             'outreach_sent',
-            'Initial Outreach Sent',
-            `Automated cold email sent to ${targetLead.firstName} (${targetLead.email}) via ${senderAccount.email}`,
+            isLiveSmtp ? 'Live Outreach Sent via SMTP' : 'Initial Outreach Sent',
+            `${isLiveSmtp ? '[Real SMTP Delivered] ' : ''}Automated cold email sent to ${targetLead.firstName} (${targetLead.email}) via ${senderAccount.email}`,
             senderAccount.id,
             senderAccount.email,
             targetLead.id
@@ -672,6 +698,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             nextFollowUpAt = Date.now() + delayMs;
           }
 
+          // If account has real SMTP configured, dispatch follow-up via backend nodemailer
+          if (senderAccount.smtpConfig?.host && senderAccount.smtpConfig?.pass) {
+            fetch('/api/email/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                smtpConfig: senderAccount.smtpConfig,
+                fromName: senderAccount.senderName,
+                fromEmail: senderAccount.email,
+                to: targetLead.email,
+                subject: renderedSubject,
+                body: renderedBody,
+              }),
+            })
+              .then(async (res) => {
+                const data = await res.json();
+                if (data.success) {
+                  console.log(`[SMTP Live Follow-up] Message ${data.messageId} sent to ${targetLead.email}`);
+                }
+              })
+              .catch((err) => console.error('[SMTP Send Network Error]', err));
+          }
+
           const updatedLead: Lead = {
             ...targetLead,
             status: nextStep ? 'outreach_sent' : 'completed',
@@ -686,10 +735,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             prevAccs.map((a) => (a.id === senderAccount.id ? { ...a, sentToday: a.sentToday + 1 } : a))
           );
 
+          const isLiveSmtp = Boolean(senderAccount.smtpConfig?.host && senderAccount.smtpConfig?.pass);
           addNotification(
             'followup_due',
-            `Follow-up #${currentStep.stepNumber} Sent`,
-            `Automated sequence email dispatched to ${targetLead.firstName} (${targetLead.email}) via ${senderAccount.email}`,
+            isLiveSmtp ? `Live Follow-up #${currentStep.stepNumber} Sent (SMTP)` : `Follow-up #${currentStep.stepNumber} Sent`,
+            `${isLiveSmtp ? '[Real SMTP Delivered] ' : ''}Automated sequence email dispatched to ${targetLead.firstName} (${targetLead.email}) via ${senderAccount.email}`,
             senderAccount.id,
             senderAccount.email,
             targetLead.id
@@ -759,17 +809,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   }, [accounts, addNotification]);
 
-  const simulateLeadOpen = useCallback((leadId: string) => {
+  const simulateLeadOpen = useCallback((leadId: string, forceHuman = false) => {
     setCampaigns((prev) =>
       prev.map((camp) => {
         const lead = camp.leads.find((l) => l.id === leadId);
         if (!lead) return camp;
 
+        const lastSent =
+          lead.lastContactedAt ||
+          (lead.history.length > 0 ? lead.history[lead.history.length - 1].timestamp : null);
+        const elapsedSec = lastSent ? (Date.now() - lastSent) / 1000 : 999;
+
+        // 10-Second Anti-Bot Rule:
+        // If pixel is hit within 10 seconds of delivery, it's an automated security scanner / bot pre-fetch.
+        if (!forceHuman && elapsedSec < 10) {
+          const updatedLead: Lead = {
+            ...lead,
+            botScansDetected: (lead.botScansDetected || 0) + 1,
+          };
+
+          addNotification(
+            'outreach_sent',
+            'Security Bot Open Filtered (<10s)',
+            `Pixel hit for ${lead.firstName} ${lead.lastName} arrived in ${elapsedSec.toFixed(1)}s (<10s threshold). Filtered out as automated security scanner pre-fetch to protect open rate accuracy.`,
+            lead.assignedAccountId,
+            '',
+            lead.id
+          );
+
+          return {
+            ...camp,
+            leads: camp.leads.map((l) => (l.id === leadId ? updatedLead : l)),
+            stats: {
+              ...camp.stats,
+              botFiltered: (camp.stats.botFiltered || 0) + 1,
+            },
+          };
+        }
+
+        // Genuine Human Open (>= 10 seconds)
         const updatedLead: Lead = {
           ...lead,
           status: lead.status === 'outreach_sent' ? 'opened' : lead.status,
           openedCount: lead.openedCount + 1,
         };
+
+        addNotification(
+          'outreach_sent',
+          'Verified Human Open Detected (≥10s)',
+          `${lead.firstName} ${lead.lastName} opened your outreach email after ${elapsedSec.toFixed(0)}s (Passed 10s anti-bot filter).`,
+          lead.assignedAccountId,
+          '',
+          lead.id
+        );
 
         return {
           ...camp,
@@ -781,7 +873,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       })
     );
-  }, []);
+  }, [addNotification]);
 
   const sendInboxReply = useCallback((leadId: string, body: string, subject?: string) => {
     setCampaigns((prev) =>
@@ -790,6 +882,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!lead) return camp;
 
         const senderAccount = accounts.find((a) => a.id === camp.assignedAccountId) || accounts[0];
+        const finalSubject = subject || `Re: ${lead.history[lead.history.length - 1]?.subject || 'Conversation'}`;
+
+        // If sender mailbox has real SMTP configured, dispatch reply directly via SMTP
+        if (senderAccount.smtpConfig?.host && senderAccount.smtpConfig?.pass) {
+          fetch('/api/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              smtpConfig: senderAccount.smtpConfig,
+              fromName: senderAccount.senderName,
+              fromEmail: senderAccount.email,
+              to: lead.email,
+              subject: finalSubject,
+              body,
+            }),
+          }).catch((err) => console.error('[SMTP Inbox Reply Network Error]', err));
+        }
+
         const newMsg: EmailMessage = {
           id: 'msg-' + Date.now(),
           leadId,
@@ -798,7 +908,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           direction: 'outbound',
           senderEmail: senderAccount.email,
           recipientEmail: lead.email,
-          subject: subject || `Re: ${lead.history[lead.history.length - 1]?.subject || 'Conversation'}`,
+          subject: finalSubject,
           body,
           timestamp: Date.now(),
           stepIndex: lead.currentStepIndex,

@@ -447,12 +447,23 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
               <p className="text-[11px] text-zinc-500 mt-1">{repliedCount} inbound replies</p>
             </div>
 
-            <div className="bg-[#111728] border border-[#1d2742] rounded-2xl p-4 col-span-2 md:col-span-1">
+            <div className="bg-[#111728] border border-[#1d2742] rounded-2xl p-4">
               <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">OPPORTUNITIES</span>
               <p className="text-2xl font-extrabold text-amber-400 mt-1.5">
                 {campaign.leads.filter((l) => l.sentiment === 'interested' || l.status === 'replied').length}
               </p>
               <p className="text-[11px] text-zinc-500 mt-1">high intent replies</p>
+            </div>
+
+            <div className="bg-[#111728] border border-[#1d2742] rounded-2xl p-4 col-span-2 md:col-span-1">
+              <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                <ShieldCheck className="h-3 w-3 text-cyan-400" />
+                <span>BOT SCANS FILTERED</span>
+              </span>
+              <p className="text-2xl font-extrabold text-cyan-400 mt-1.5">
+                {campaign.stats.botFiltered || 0}
+              </p>
+              <p className="text-[11px] text-zinc-500 mt-1">&lt;10s fake opens ignored</p>
             </div>
           </div>
 
@@ -659,14 +670,19 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-[#182138] bg-[#0c101d] text-zinc-400 uppercase tracking-wider text-[10px] font-semibold">
-                    <th className="py-3 px-3 w-10 text-center">
-                      <input
-                        type="checkbox"
-                        checked={filteredLeads.length > 0 && selectedLeadIds.length === filteredLeads.length}
-                        onChange={handleToggleSelectAllLeads}
-                        className="h-4 w-4 rounded border-[#243050] bg-[#0c101d] text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-indigo-600"
-                        title="Mark all leads"
-                      />
+                    <th className="py-3 px-3 w-12 text-center">
+                      <button
+                        type="button"
+                        onClick={handleToggleSelectAllLeads}
+                        className={`px-2 py-0.5 rounded-[6px] text-[10px] font-medium border-2 transition-all duration-150 cursor-pointer ${
+                          selectedLeadIds.length > 0 && selectedLeadIds.length === filteredLeads.length
+                            ? 'border-[var(--accent)] bg-[rgba(91,141,239,0.15)] text-[var(--accent)]'
+                            : 'border-[var(--border)] text-zinc-400 hover:text-white'
+                        }`}
+                        title="Toggle all leads"
+                      >
+                        {selectedLeadIds.length === filteredLeads.length ? 'All' : 'Select'}
+                      </button>
                     </th>
                     <th className="py-3 px-4">Contact</th>
                     <th className="py-3 px-4">Company & Website</th>
@@ -677,7 +693,7 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#161d31]">
+                <tbody className="divide-y divide-[var(--border)]">
                   {filteredLeads.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-zinc-500">
@@ -690,18 +706,21 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
                       return (
                         <tr
                           key={lead.id}
-                          className={`transition-colors group ${
-                            isMarked ? 'bg-indigo-950/30' : 'hover:bg-[#13192c]'
+                          onClick={() => handleToggleSelectLead(lead.id)}
+                          className={`transition-all duration-150 cursor-pointer border-l-4 ${
+                            isMarked
+                              ? 'border-l-[var(--accent)] bg-[rgba(91,141,239,0.08)]'
+                              : 'border-l-transparent hover:bg-white/[0.02]'
                           }`}
                         >
-                          {/* Selection Checkbox */}
+                          {/* Smooth border selection indicator */}
                           <td className="py-3.5 px-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={isMarked}
-                              onChange={() => handleToggleSelectLead(lead.id)}
-                              className="h-4 w-4 rounded border-[#243050] bg-[#0c101d] text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-indigo-600"
-                              title="Mark this lead"
+                            <span
+                              className={`inline-block h-3.5 w-3.5 rounded-full border-2 transition-all duration-150 ${
+                                isMarked
+                                  ? 'border-[var(--accent)] bg-[var(--accent)] shadow-[0_0_0_2px_rgba(91,141,239,0.25)]'
+                                  : 'border-[var(--border)] bg-transparent'
+                              }`}
                             />
                           </td>
 
@@ -1233,10 +1252,10 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
                               assignedAccountId: updated[0] || campaign.assignedAccountId,
                             });
                           }}
-                          className={`flex items-center justify-between p-2.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                          className={`flex items-center justify-between p-2.5 rounded-lg text-xs transition-all duration-150 cursor-pointer border-2 ${
                             isAssigned
-                              ? 'bg-indigo-600/15 text-white border border-indigo-500/30'
-                              : 'text-zinc-300 hover:bg-[#151c32] hover:text-white border border-transparent'
+                              ? 'bg-[rgba(91,141,239,0.08)] text-white border-[var(--accent)] shadow-[0_0_0_1px_rgba(91,141,239,0.2)]'
+                              : 'text-zinc-300 hover:text-white border-[var(--border)] hover:border-[var(--text-secondary)]/50'
                           }`}
                         >
                           <div className="flex items-center gap-2.5">
@@ -1271,12 +1290,11 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
                               Warmup: {acc.warmupScore}%
                             </span>
                             {isAssigned ? (
-                              <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30">
-                                <Check className="h-3 w-3" />
-                                <span>Added</span>
+                              <span className="text-[11px] text-[var(--accent)] font-semibold px-2 py-0.5 rounded-md bg-[rgba(91,141,239,0.12)] border border-[var(--accent)]">
+                                <span>Selected</span>
                               </span>
                             ) : (
-                              <span className="flex items-center gap-1 text-[11px] text-indigo-400 font-semibold px-2 py-0.5 rounded-md bg-indigo-600/10 border border-indigo-500/30">
+                              <span className="flex items-center gap-1 text-[11px] text-zinc-400 font-semibold px-2 py-0.5 rounded-md border border-[var(--border)] hover:text-white">
                                 <Plus className="h-3 w-3" />
                                 <span>Add</span>
                               </span>
@@ -1459,7 +1477,7 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
               <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">
                 AUTOMATIC DELIVERABILITY & SAFETY RULES
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
                 <div className="p-3 rounded-xl bg-[#090d18] border border-[#172038] flex items-start gap-2.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
                   <div>
@@ -1476,6 +1494,16 @@ export const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({
                     <p className="text-xs font-semibold text-white">Track Open Rates</p>
                     <p className="text-[11px] text-zinc-400 mt-0.5">
                       Applied automatically via invisible 1x1 tracking pixel to monitor recipient opens.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-[#090d18] border border-[#172038] flex items-start gap-2.5">
+                  <CheckCircle2 className="h-4 w-4 text-cyan-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-semibold text-white">10s Anti-Bot Scanner Filter</p>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                      Applied automatically. Pixel hits within 10s of delivery are identified as scanner pre-fetches and discarded.
                     </p>
                   </div>
                 </div>

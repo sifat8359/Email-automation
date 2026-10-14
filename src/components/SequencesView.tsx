@@ -257,14 +257,20 @@ export const SequencesView: React.FC = () => {
                 <p className="font-medium text-white">Test Mode (Fast 6-14s Jitter)</p>
                 <p className="text-[10px] text-zinc-500">Speeds up dispatch for demonstration</p>
               </div>
-              <input
-                type="checkbox"
-                checked={timingSettings.testModeFastInterval}
-                onChange={(e) =>
-                  updateTimingSettings({ testModeFastInterval: e.target.checked })
+              <button
+                type="button"
+                onClick={() =>
+                  updateTimingSettings({ testModeFastInterval: !timingSettings.testModeFastInterval })
                 }
-                className="h-4 w-4 rounded accent-indigo-600 cursor-pointer"
-              />
+                className={`px-2.5 py-1 rounded-[8px] text-xs font-medium border-2 transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
+                  timingSettings.testModeFastInterval
+                    ? 'border-[var(--accent)] bg-[rgba(91,141,239,0.15)] text-[var(--accent)]'
+                    : 'border-[var(--border)] text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full transition-colors ${timingSettings.testModeFastInterval ? 'bg-[var(--accent)]' : 'bg-zinc-600'}`} />
+                <span>{timingSettings.testModeFastInterval ? 'Enabled' : 'Disabled'}</span>
+              </button>
             </div>
           </div>
         </div>

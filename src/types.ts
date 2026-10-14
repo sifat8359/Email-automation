@@ -8,6 +8,16 @@ export type LeadStatus =
   | 'completed'          // finished all sequence steps
   | 'paused';
 
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure?: boolean;
+  user: string;
+  pass: string;
+  isVerified?: boolean;
+  lastVerifiedAt?: number;
+}
+
 export interface GmailAccount {
   id: string;
   email: string;
@@ -20,8 +30,9 @@ export interface GmailAccount {
   warmupScore: number;
   unreadReplies: number;
   dueFollowUps: number;
-  provider: 'gmail' | 'workspace' | 'custom_smtp';
+  provider: 'gmail' | 'workspace' | 'outlook' | 'zoho' | 'custom_smtp';
   signature?: string;
+  smtpConfig?: SmtpConfig;
   connectedAt: string;
 }
 
@@ -100,6 +111,7 @@ export interface Lead {
   sentiment?: 'interested' | 'meeting_requested' | 'not_interested' | 'neutral';
   notes?: string;
   customFields?: Record<string, string>;
+  botScansDetected?: number;
 }
 
 export interface CampaignScheduleWindow {
@@ -116,6 +128,7 @@ export interface CampaignOptions {
   trackClicks: boolean;
   customUnsubscribeText?: string;
   assignedAccountIds?: string[];
+  botFilterThresholdSeconds?: number; // Filter scanner pre-fetches (e.g. 10 seconds)
 }
 
 export interface Campaign {
@@ -138,6 +151,7 @@ export interface Campaign {
     opened: number;
     replied: number;
     bounced: number;
+    botFiltered?: number;
   };
 }
 

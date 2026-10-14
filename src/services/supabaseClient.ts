@@ -7,19 +7,28 @@ const STORAGE_KEY_DATA = 'nexusreach_campaigns_cache';
 let cachedClient: SupabaseClient | null = null;
 
 export function getStoredSupabaseConfig(): SupabaseConfig {
+  const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+  const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY_CONFIG);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return {
+        url: parsed.url || envUrl,
+        anonKey: parsed.anonKey || envKey,
+        isConnected: parsed.isConnected ?? (Boolean(parsed.url || envUrl) && Boolean(parsed.anonKey || envKey)),
+        lastSyncTimestamp: parsed.lastSyncTimestamp ?? null,
+      };
     }
   } catch (e) {
     console.error('Failed to parse stored Supabase config:', e);
   }
 
   return {
-    url: '',
-    anonKey: '',
-    isConnected: false,
+    url: envUrl,
+    anonKey: envKey,
+    isConnected: Boolean(envUrl && envKey),
     lastSyncTimestamp: null,
   };
 }
