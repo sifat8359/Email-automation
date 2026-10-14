@@ -1,0 +1,6 @@
+{
+  "name": "NexusReach - Cold Outreach Automation SaaS",
+  "description": "Multi-account Gmail cold outreach automation platform with randomized delay throttling, multi-step follow-up sequences, due follow-up tracking, and unified multi-inbox.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

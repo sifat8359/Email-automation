@@ -1,0 +1,328 @@
+import { GmailAccount, Campaign, TimingSettings, Lead, SequenceStep } from '../types';
+
+export const INITIAL_ACCOUNTS: GmailAccount[] = [
+  {
+    id: 'acc-1',
+    email: 'doha.flow8@gmail.com',
+    senderName: 'Sifat',
+    avatar: '',
+    color: '#8b5cf6',
+    status: 'active',
+    dailyLimit: 60,
+    sentToday: 15,
+    warmupScore: 100,
+    unreadReplies: 2,
+    dueFollowUps: 1,
+    provider: 'gmail',
+    connectedAt: '2026-10-01T10:00:00Z',
+  },
+  {
+    id: 'acc-2',
+    email: 'doha.mainauto@gmail.com',
+    senderName: 'Doha Growth',
+    avatar: '',
+    color: '#06b6d4',
+    status: 'active',
+    dailyLimit: 50,
+    sentToday: 8,
+    warmupScore: 98,
+    unreadReplies: 1,
+    dueFollowUps: 0,
+    provider: 'gmail',
+    connectedAt: '2026-10-05T14:30:00Z',
+  },
+];
+
+export const INITIAL_TIMING_SETTINGS: TimingSettings = {
+  minIntervalSeconds: 120, // 2 minutes
+  maxIntervalSeconds: 300, // 5 minutes
+  enableRandomInterval: true,
+  testModeFastInterval: false,
+  sendingWindowStart: '08:00', // Morning 8:00 AM
+  sendingWindowEnd: '22:00',   // Night 10:00 PM
+  stopOnReply: true,
+  trackOpens: true,
+  trackClicks: true,
+};
+
+const DEFAULT_SEQUENCE_STEPS_1: SequenceStep[] = [
+  {
+    id: 'step-1',
+    stepNumber: 1,
+    type: 'initial_outreach',
+    delayAmount: 0,
+    delayUnit: 'minutes',
+    subject: 'Quick question about {{companyName}}',
+    body: `Hi {{firstName}},
+
+I came across {{companyName}} via {{website}} and was really impressed by what your team is building.
+
+Are you currently exploring automated outbound channels to scale customer acquisition this quarter?
+
+Best,
+{{senderName}}`,
+    triggerCondition: 'always',
+  },
+  {
+    id: 'step-2',
+    stepNumber: 2,
+    type: 'auto_followup',
+    delayAmount: 1,
+    delayUnit: 'minutes', // 1-minute follow-up support
+    subject: 'Re: Quick question about {{companyName}}',
+    body: `Hi {{firstName}},
+
+Following up briefly on my previous note. We recently helped a similar company in your space scale reply rates by 3.4x using deliverability throttling and warmups.
+
+Would you be open to a 10-minute chat this Thursday?
+
+Best,
+{{senderName}}`,
+    triggerCondition: 'no_reply',
+  },
+  {
+    id: 'step-3',
+    stepNumber: 3,
+    type: 'auto_followup',
+    delayAmount: 3,
+    delayUnit: 'days',
+    subject: 'Re: Quick question about {{companyName}}',
+    body: `Hey {{firstName}},
+
+Wanted to make sure this didn't slip through the cracks. If customer acquisition isn't on your radar right now, no worries at all!
+
+If you do want to take a look, here is our demo breakdown: https://outreach.nexus/demo
+
+Cheers,
+{{senderName}}`,
+    triggerCondition: 'no_reply',
+  },
+];
+
+const DEFAULT_LEADS_CAMPAIGN_1: Lead[] = [
+  {
+    id: 'lead-1',
+    campaignId: 'camp-1',
+    firstName: 'Marcus',
+    lastName: 'Chen',
+    email: 'marcus.chen@stripe-demo.com',
+    companyName: 'Stripe Ecosystem',
+    website: 'https://stripe.com',
+    title: 'Head of Growth',
+    status: 'replied',
+    assignedAccountId: 'acc-1',
+    sequenceId: 'seq-camp-1',
+    currentStepIndex: 1,
+    lastContactedAt: Date.now() - 3600000,
+    nextFollowUpAt: null,
+    openedCount: 3,
+    clickedCount: 1,
+    sentiment: 'interested',
+    history: [
+      {
+        id: 'msg-1',
+        leadId: 'lead-1',
+        accountId: 'acc-1',
+        accountEmail: 'doha.flow8@gmail.com',
+        direction: 'outbound',
+        senderEmail: 'doha.flow8@gmail.com',
+        recipientEmail: 'marcus.chen@stripe-demo.com',
+        subject: 'Quick question about Stripe Ecosystem',
+        body: "Hi Marcus,\n\nI came across Stripe Ecosystem via stripe.com and was really impressed by your outbound scale. Are you looking to scale your store's customer acquisition this quarter?\n\nBest,\nSifat",
+        timestamp: Date.now() - 7200000,
+        stepIndex: 0,
+        status: 'opened',
+        read: true,
+      },
+      {
+        id: 'msg-2',
+        leadId: 'lead-1',
+        accountId: 'acc-1',
+        accountEmail: 'doha.flow8@gmail.com',
+        direction: 'inbound',
+        senderEmail: 'marcus.chen@stripe-demo.com',
+        recipientEmail: 'doha.flow8@gmail.com',
+        subject: 'Re: Quick question about Stripe Ecosystem',
+        body: "Hey Sifat, saw your note about Stripe Ecosystem. We are indeed evaluating our outbound stack this month. Let's talk Friday morning at 10 AM.",
+        timestamp: Date.now() - 3600000,
+        stepIndex: 0,
+        status: 'replied',
+        read: false,
+      },
+    ],
+  },
+  {
+    id: 'lead-2',
+    campaignId: 'camp-1',
+    firstName: 'Sarah',
+    lastName: 'Jenkins',
+    email: 'sarah.j@vercel-partner.io',
+    companyName: 'Vercel Deployment',
+    website: 'https://vercel.com',
+    title: 'VP of Engineering',
+    status: 'opened',
+    assignedAccountId: 'acc-1',
+    sequenceId: 'seq-camp-1',
+    currentStepIndex: 0,
+    lastContactedAt: Date.now() - 1800000,
+    nextFollowUpAt: Date.now() + 60000, // Due in 1 minute
+    openedCount: 2,
+    clickedCount: 0,
+    history: [
+      {
+        id: 'msg-3',
+        leadId: 'lead-2',
+        accountId: 'acc-1',
+        accountEmail: 'doha.flow8@gmail.com',
+        direction: 'outbound',
+        senderEmail: 'doha.flow8@gmail.com',
+        recipientEmail: 'sarah.j@vercel-partner.io',
+        subject: 'Quick question about Vercel Deployment',
+        body: "Hi Sarah,\n\nI came across Vercel Deployment via vercel.com and wanted to see if scaling outbound delivery is on your roadmap this quarter?\n\nBest,\nSifat",
+        timestamp: Date.now() - 1800000,
+        stepIndex: 0,
+        status: 'opened',
+        read: true,
+      },
+    ],
+  },
+  {
+    id: 'lead-3',
+    campaignId: 'camp-1',
+    firstName: 'Elena',
+    lastName: 'Rostova',
+    email: 'elena@novatech-solutions.com',
+    companyName: 'NovaTech Solutions',
+    website: 'https://novatech-solutions.com',
+    title: 'Founder & CEO',
+    status: 'ready_for_outreach',
+    assignedAccountId: 'acc-1',
+    sequenceId: 'seq-camp-1',
+    currentStepIndex: 0,
+    lastContactedAt: null,
+    nextFollowUpAt: null,
+    openedCount: 0,
+    clickedCount: 0,
+    history: [],
+  },
+  {
+    id: 'lead-4',
+    campaignId: 'camp-1',
+    firstName: 'David',
+    lastName: 'Kim',
+    email: 'david.kim@prismpulse.ai',
+    companyName: 'PrismPulse AI',
+    website: 'https://prismpulse.ai',
+    title: 'Head of Sales',
+    status: 'ready_for_outreach',
+    assignedAccountId: 'acc-1',
+    sequenceId: 'seq-camp-1',
+    currentStepIndex: 0,
+    lastContactedAt: null,
+    nextFollowUpAt: null,
+    openedCount: 0,
+    clickedCount: 0,
+    history: [],
+  },
+  {
+    id: 'lead-5',
+    campaignId: 'camp-1',
+    firstName: 'Rudy',
+    lastName: 'Burgeon',
+    email: 'rudy@burgeonoutdoor.com',
+    companyName: 'Burgeon Outdoor',
+    website: 'https://burgeonoutdoor.com',
+    title: 'E-Commerce Director',
+    status: 'outreach_sent',
+    assignedAccountId: 'acc-1',
+    sequenceId: 'seq-camp-1',
+    currentStepIndex: 0,
+    lastContactedAt: Date.now() - 4000000,
+    nextFollowUpAt: Date.now() + 1200000,
+    openedCount: 0,
+    clickedCount: 0,
+    history: [
+      {
+        id: 'msg-5',
+        leadId: 'lead-5',
+        accountId: 'acc-1',
+        accountEmail: 'doha.flow8@gmail.com',
+        direction: 'outbound',
+        senderEmail: 'doha.flow8@gmail.com',
+        recipientEmail: 'rudy@burgeonoutdoor.com',
+        subject: 'Quick question about Burgeon Outdoor',
+        body: "Hi Rudy,\n\nI came across Burgeon Outdoor via burgeonoutdoor.com and loved your gear line. Are you looking to scale e-commerce wholesale reach this quarter?\n\nBest,\nSifat",
+        timestamp: Date.now() - 4000000,
+        stepIndex: 0,
+        status: 'sent',
+        read: true,
+      },
+    ],
+  },
+];
+
+export const INITIAL_CAMPAIGNS: Campaign[] = [
+  {
+    id: 'camp-1',
+    name: 'SaaS Founders Q4 Outreach',
+    status: 'active',
+    assignedAccountId: 'acc-1',
+    assignedAccountIds: ['acc-1', 'acc-2'],
+    scheduleWindow: {
+      startTime: '08:00', // Morning 8 AM
+      endTime: '22:00',   // Night 10 PM
+      timezone: 'Asia/Dhaka',
+      daysOfWeek: [1, 2, 3, 4, 5],
+    },
+    minDelayMinutes: 2,
+    maxDelayMinutes: 5,
+    dailyLimit: 40,
+    sequenceSteps: DEFAULT_SEQUENCE_STEPS_1,
+    leads: DEFAULT_LEADS_CAMPAIGN_1,
+    createdAt: '2026-10-10T09:00:00Z',
+    stats: {
+      totalLeads: 5,
+      sent: 3,
+      opened: 2,
+      replied: 1,
+      bounced: 0,
+    },
+  },
+  {
+    id: 'camp-2',
+    name: 'E-Commerce Brands Pipeline',
+    status: 'paused',
+    assignedAccountId: 'acc-2',
+    assignedAccountIds: ['acc-2', 'acc-1'],
+    scheduleWindow: {
+      startTime: '08:00',
+      endTime: '22:00',
+      timezone: 'Asia/Dhaka',
+      daysOfWeek: [1, 2, 3, 4, 5, 6],
+    },
+    minDelayMinutes: 2,
+    maxDelayMinutes: 5,
+    dailyLimit: 30,
+    sequenceSteps: [
+      {
+        id: 'step-c2-1',
+        stepNumber: 1,
+        type: 'initial_outreach',
+        delayAmount: 0,
+        delayUnit: 'minutes',
+        subject: 'Growth partnership for {{companyName}}',
+        body: 'Hi {{firstName}},\n\nChecked out {{website}} and noticed great product traction. Would love to share how we helped similar brands scale acquisition.\n\nBest,\nDoha Growth',
+        triggerCondition: 'always',
+      },
+    ],
+    leads: [],
+    createdAt: '2026-10-12T14:00:00Z',
+    stats: {
+      totalLeads: 0,
+      sent: 0,
+      opened: 0,
+      replied: 0,
+      bounced: 0,
+    },
+  },
+];
